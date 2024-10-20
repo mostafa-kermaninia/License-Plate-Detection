@@ -6,11 +6,10 @@ carImage = imread(imagePath);
 % Step 2: Resize the image (optional, based on your image size)
 carImage = imresize(carImage, [400, NaN]);
 
-% Step 3: Convert the image to HSV color space (easier to identify blue region)
+% Step 3: Convert the image to HSV color space (to detect the blue region more easily)
 hsvImage = rgb2hsv(carImage);
 
 % Step 4: Define thresholds for the blue color in HSV
-% These values may need slight tuning based on the image quality and lighting
 blueHueMin = 0.55;  % Minimum hue for blue
 blueHueMax = 0.75;  % Maximum hue for blue
 blueSatMin = 0.4;   % Minimum saturation for blue
@@ -43,14 +42,17 @@ end
 if blueRegionIdx > 0
     blueRegion = stats(blueRegionIdx).BoundingBox;
     
-    % Step 9: Assuming the license plate extends to the right of the blue region
-    % Extend the bounding box to include the plate
-    plateX = blueRegion(1) + blueRegion(3);  % Start at the right edge of the blue region
-    plateWidth = size(carImage, 2) - plateX;  % Extend to the right edge of the image
+    % Step 9: Estimate the right boundary based on the fact that blue part is 20% of the plate
+    blueWidth = blueRegion(3);  % Width of the blue region
+    plateWidth = blueWidth * 9;  % The whole plate is approximately 5 times the blue region width
+    
+    % Define the plate bounding box using the top, bottom, left, and calculated right boundary
+    plateX = blueRegion(1);  % The left boundary is the same as the blue region's left boundary
+    plateY = blueRegion(2);  % The top boundary is the same as the blue region's top boundary
     plateHeight = blueRegion(4);  % Use the same height as the blue region
-
-    % Define the license plate region (right of the blue area)
-    plateRegion = [plateX, blueRegion(2), plateWidth, plateHeight];
+    
+    % The right boundary is calculated by adding the plateWidth to the left boundary
+    plateRegion = [plateX, plateY, plateWidth, plateHeight];
 
     % Step 10: Crop and display the license plate
     licensePlate = imcrop(carImage, plateRegion);
@@ -59,6 +61,8 @@ if blueRegionIdx > 0
 
     % Save the extracted license plate
     imwrite(licensePlate, 'detected_license_plate.png');
+    
+    disp('License plate detected and saved successfully.');
 else
     disp('Blue region not detected. No license plate found.');
 end
