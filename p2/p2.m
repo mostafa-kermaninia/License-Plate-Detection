@@ -5,7 +5,7 @@ clear;
 %% Part 0: Loading the mapset
 
 % Get a list of all files in the "Map Set" directory
-files = dir('Map Set');
+files = dir('persian_dataset');
 
 % Calculate the number of valid files (not '.' and '..')
 % The first two elements ('.' and '..') are not image files, so delete them.
@@ -25,10 +25,58 @@ for i = 1:len
    TRAIN{2, i} = files(i + 2).name(1);
 end
 
-% Save the TRAIN cell array to a file named "TRAININGSET.mat"
-% This will store the images and corresponding labels for future use.
-save TRAININGSET TRAIN;
+%% part 0.1 : convert RGB mapset to Binary images and save them again
+% Define the threshold value for binarization
+threshold = 128;  % Adjust the threshold as needed
 
+% Loop through each image in the TRAIN dataset
+for i = 1:size(TRAIN, 2)
+    % Extract the RGB image from the training set
+    rgbImage = TRAIN{1, i};
+
+    % Convert the RGB image to grayscale using your custom function
+    grayImage = mygrayfun(rgbImage);
+
+    % Convert the grayscale image to binary (logical) using your custom function
+    binaryImage = mybinaryfun(grayImage, threshold);
+
+    % Replace the RGB image in TRAIN with the binary image
+    TRAIN{1, i} = binaryImage;
+end
+
+%% part 0.2 : Code to Detect the Bounding Box, Crop, and Resize
+
+% Loop through each image in the TRAIN dataset
+for i = 1:size(TRAIN, 2)
+    % Extract the binary image from the training set
+    binaryImage = TRAIN{1, i};
+    
+    % Find the rows and columns that contain the value 1
+    [rows, cols] = find(binaryImage == 1);
+
+    % If no '1' pixels are found, keep the image as is
+    if isempty(rows) || isempty(cols)
+        croppedImage = binaryImage;  % No cropping needed, no '1' found
+    else
+        % Detect the smallest bounding box that contains all the '1' pixels
+        minRow = min(rows);
+        maxRow = max(rows);
+        minCol = min(cols);
+        maxCol = max(cols);
+        
+        % Crop the image to that bounding box
+        croppedImage = binaryImage(minRow:maxRow, minCol:maxCol);
+    end
+    
+    % Resize the cropped image back to 150x150
+    resizedImage = imresize(croppedImage, [150 150]);
+
+    % Overwrite the original image in the TRAIN cell array with the resized image
+    TRAIN{1, i} = resizedImage;
+end
+
+% Save the modified TRAIN cell array back to the same TRAININGSET.mat file
+save TRAININGSET TRAIN;
 %% part 1 : input picture
 [file,path]=uigetfile({'*.jpg;*.png;*.jpeg'},'Select your image');
 
@@ -37,7 +85,7 @@ img = imread(fullfile(path, file));
 figure, imshow(img);
 
 %% part 2 : resize
-img = imresize(img, [300, 500]);
+img = imresize(img, [150, 700]);
 figure, imshow(img);
 
 %% Convert the color image to grayscale using mygrayfun function
@@ -45,12 +93,12 @@ grayImg = mygrayfun(img);
 figure, imshow(grayImg);
 
 %% Convert the grayImg to binary image using mybinaryfun function
-threshold = 100;  % Selected threshold value 
+threshold = 120;  % Selected threshold value 
 binaryImage = mybinaryfun(grayImg, threshold);
 figure, imshow(binaryImage);
 
 %% Display the cleaned binary image
-minSize = 300;  % Minimum size of objects to keep
+minSize = 900;  % Minimum size of objects to keep
 cleanImage = myremovecom(binaryImage, minSize);
 figure, imshow(cleanImage);
 title('Cleaned Binary Image (Small Components Removed)');
@@ -72,8 +120,8 @@ for segmentIndex = 1:numObjects
    
     % Extract the sub-image (the current segment) from the binary cleanImage.
     % The segment is defined by the bounding box surrounding the object (min/max row and column indices).
-    % Then, resize the extracted segment to 42x24 pixels to match the size of the templates in the training set.
-    currentSegment = imresize(cleanImage(min(rowIndices):max(rowIndices), min(colIndices):max(colIndices)), [42, 24]);
+    % Then, resize the extracted segment to 150*150 pixels to match the size of the templates in the training set.
+    currentSegment = imresize(cleanImage(min(rowIndices):max(rowIndices), min(colIndices):max(colIndices)), [150, 150]);
     
     % Compute correlation scores for all templates
     ro = zeros(1, numTemplates);  % Initialize correlation scores array
@@ -104,7 +152,7 @@ for segmentIndex = 1:numObjects
     
     % Find the best match and apply a threshold
     [bestScore, bestMatchIndex] = max(ro);  % Get the best match score and index
-    if bestScore > 0.48  % Threshold for accepting a match
+    if bestScore > 0.5  % Threshold for accepting a match
         recognizedText = [recognizedText, TRAIN{2, bestMatchIndex}];  % Append detected character
     end
 end
