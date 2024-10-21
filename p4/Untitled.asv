@@ -29,6 +29,8 @@ if ~isempty(plateCenter1) && ~isempty(plateCenter2)
 
     fprintf('Horizontal movement: %.2f pixels\n', displacementX);
     fprintf('Vertical movement: %.2f pixels\n', displacementY);
+    
+    Speed = sqrt(displacementX ^ 2 + displacementY ^ 2)
 else
     disp('Failed to detect plate in one or both frames.');
 end
