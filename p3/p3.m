@@ -41,10 +41,8 @@ end
 % Step 8: Extract the bounding box of the blue region
 if blueRegionIdx > 0
     blueRegion = stats(blueRegionIdx).BoundingBox;
-    
-    % Step 9: Estimate the right boundary based on the fact that blue part is 20% of the plate
     blueWidth = blueRegion(3);  % Width of the blue region
-    plateWidth = blueWidth * 9;  % The whole plate is approximately 5 times the blue region width
+    plateWidth = blueWidth * 9;  % The whole plate is approximately 9 times the blue region width
     
     % Define the plate bounding box using the top, bottom, left, and calculated right boundary
     plateX = blueRegion(1);  % The left boundary is the same as the blue region's left boundary
