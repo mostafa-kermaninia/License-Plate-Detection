@@ -1,0 +1,125 @@
+clc
+close all;
+clear;
+
+%% Load the video
+[videoFile, videoPath] = uigetfile({'*.mp4;*.avi;*.mov'}, 'Select a video file');
+videoPath = fullfile(videoPath, videoFile);
+videoObject = VideoReader(videoPath);
+
+%% Select two different frames randomly
+frameNumber1 = 50; 
+frameNumber2 = 120;
+
+
+%% Read both frames as image
+frame1 = read(videoObject, frameNumber1);
+frame2 = read(videoObject, frameNumber2);
+
+%% Detect the license plate and find the center for both frames using p3 code
+plateCenter1 = detectPlateAndCenter(frame1);
+plateCenter2 = detectPlateAndCenter(frame2);
+
+%% Report the detected plate centers, calculated the distance between them and the speed (pixel/sec)
+if ~isempty(plateCenter1) && ~isempty(plateCenter2)
+    % Print the centers coordinates
+    fprintf('Center of plate in Frame 1: (%.2f, %.2f)\n', plateCenter1(1), plateCenter1(2));
+    fprintf('Center of plate in Frame 2: (%.2f, %.2f)\n', plateCenter2(1), plateCenter2(2));
+
+    % Calculate the movement of the plate center between the two frames
+    displacementX = plateCenter2(1) - plateCenter1(1);  % Horizontal movement
+    displacementY = plateCenter2(2) - plateCenter1(2);  % Vertical movement
+
+    % Print the Horizontal and Vertical movement
+    fprintf('Horizontal movement: %.2f pixels\n', displacementX);
+    fprintf('Vertical movement: %.2f pixels\n', displacementY);
+
+    % Calculate speed (pixel/sec)
+    frameRate = videoObject.FrameRate;
+    frameDifference = abs(frameNumber2 - frameNumber1);  % Difference in frame numbers
+    timeDifference = frameDifference / frameRate;  % Time difference in seconds
+    speed = sqrt(displacementX ^ 2 + displacementY ^ 2) / timeDifference;
+    fprintf('The average speed of the car between frame 50 and 120 is %.2f pixel per second\n', speed); % Print the calculated speed
+else
+    disp('Failed to detect plate in one or both frames.');
+end
+
+%% p3 plate detector
+function plateCenter = detectPlateAndCenter(img)
+    %% Resize the image
+    img = imresize(img, [400, NaN]);
+    %% Convert the image to HSV color space (to detect blue more easily)
+    hsvImage = rgb2hsv(img);
+    %% Define thresholds for the blue color in HSV
+    blueHueMin = 0.58;  % Minimum hue for blue
+    blueHueMax = 0.75;  % Maximum hue for blue
+    blueSatMin = 0.4;   % Minimum saturation for blue
+    blueValMin = 0.2;   % Minimum value for blue (brightness)
+
+    %% Create a binary image
+    binaryImg = (hsvImage(:,:,1) >= blueHueMin) & (hsvImage(:,:,1) <= blueHueMax) & ...
+        (hsvImage(:,:,2) >= blueSatMin) & ...
+        (hsvImage(:,:,3) >= blueValMin);
+
+    %% Label connected components
+    [LabeledImg, num] = bwlabel(binaryImg);
+
+    %% find the largest blue component
+    maxArea = 0;
+    for k = 1:num
+        % Find the pixel coordinates of the current component
+        [rows, cols] = find(LabeledImg == k);
+        
+        % Calculate the bounding box (Bounding Box)
+        minRow = min(rows);
+        maxRow = max(rows);
+        minCol = min(cols);
+        maxCol = max(cols);
+        
+        % Compute the width and height of the bounding box
+        blueWidth = maxCol - minCol + 1;
+        blueHeight = maxRow - minRow + 1;
+        
+        % Calculate the area of the region (Area)
+        area = length(rows);  % Number of pixels corresponds to the area
+        
+        % Find the largest region (the blue part of the plate)
+        if area > maxArea
+            maxArea = area;
+            bluestatus = [minCol, minRow, blueWidth, blueHeight];
+        end
+    end
+
+    %% Extract the center of the plate
+    if maxArea > 0
+        % Estimate the right boundary based on the fact that blue part is 1/11 of the plate
+        blueWidth = bluestatus(3);  % Width of the blue region
+        plateWidth = blueWidth * 11;  % The whole plate is approximately 11 times the blue region width
+        
+        % Define the plate bounding box using the top, bottom, left, and calculated right boundary
+        plateX = round(bluestatus(1));  % The left boundary is the same as the blue region's left boundary
+        plateY = round(bluestatus(2));  % The top boundary is the same as the blue region's top boundary
+        plateHeight = round(bluestatus(4));  % Use the same height as the blue region
+        
+        % Calculate the center pixel
+        plateCenterX = plateX + round(plateWidth) / 2;
+        plateCenterY = plateY + plateHeight / 2;
+        plateCenter = [plateCenterX, plateCenterY];
+        
+        % Show the selected pixel in the frame
+        figure, imshow(img);
+        hold on;
+        radius = 5;  % Set the radius of the dot that shows the center of plate
+        rectangle('Position', [plateCenterX - radius, plateCenterY - radius, 2*radius, 2*radius], ...
+            'Curvature', [1, 1], 'EdgeColor', 'r', 'FaceColor', 'r');
+        title('Center License Plate');
+        hold off;
+    else
+        plateCenter = [];  % If no plate is detected, return empty
+        disp('No plate detected in the frame.');
+    end
+
+end
+
+%% p2 part
+
